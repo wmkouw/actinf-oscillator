@@ -25,25 +25,21 @@ function minEFE(current_state,
     # Objective function
     G(policy) = EFE(policy, current_state, goal_state, model_params, transition_function, order=order, time_horizon=plan_horizon)
 
-    # Gradient objective
-    ∇G = gradient(()-> G(policy), Params([policy]))
-
     # Gradient descent with early stopping
-    G_ = [Inf,0]
-    i = 2
-    while abs(G_[i] - G_[i-1]) > 1e-6
+    Gn = []
+    for n = 1:num_iters
+    
+        # Gradient objective
+        ∇G = gradient(()-> G(policy), Params([policy]))
         
         # Update policy
-        update!(opt, policy, convert(Vector{Float64}, ∇G[policy]))
+        update!(opt, policy, ∇G[policy])
 
         # Compute EFE for current policy
-        push!(G_, G(policy))
-
-        # Tick up
-        i += 1
+        push!(Gn, G(policy))
     end
 
-    return policy, G_[3:end]
+    return policy, Gn
 end
 
 function EFE(policy, current_state, goal_state, model_params, transition; order=2, time_horizon=1)
