@@ -1,6 +1,9 @@
 
 using LinearAlgebra
-using Flux: update!
+using Optim
+import ForneyLab: unsafeMean, unsafePrecision
+# using Zygote: gradient, Params
+# using Flux: update!, Descent, ADAM
 
 using StatsFuns: @irrational
 @irrational log2π  1.8378770664093454836 log(big(2.)*π)
@@ -8,6 +11,22 @@ using StatsFuns: @irrational
 function kl(μ_p, μ_q, σ_p, σ_q)
     "KL of 2 univariate Normals"
     log(σ_q / σ_p) + (σ_p + (μ_p - μ_q)^2)/ (2*σ_q) - 0.5
+end
+
+function umean(d::ProbabilityDistribution{Univariate, T}) where T<:Union{Gaussian,Gamma}
+    return ForneyLab.unsafeMean(d)
+end
+
+function umean(d::ProbabilityDistribution{Multivariate, T}) where T<:Union{Gaussian,Gamma}
+    return ForneyLab.unsafeMean(d)
+end
+
+function uprec(d::ProbabilityDistribution{Univariate, T}) where T<:Union{Gaussian,Gamma}
+    return ForneyLab.unsafePrecision(d)
+end
+
+function uprec(d::ProbabilityDistribution{Multivariate, T}) where T<:Union{Gaussian,Gamma}
+    return ForneyLab.unsafePrecision(d)
 end
 
 function minEFE(current_state, 
@@ -19,27 +38,13 @@ function minEFE(current_state,
                 num_iters=100, 
                 plan_horizon=1)
 
-    # Starting policy
-    policy = [rand() for i in 1:plan_horizon]
-
     # Objective function
-    G(policy) = EFE(policy, current_state, goal_state, model_params, transition_function, order=order, time_horizon=plan_horizon)
+    G(π) = EFE(π, current_state, goal_state, model_params, transition_function, order=order, time_horizon=plan_horizon)
 
-    # Gradient descent with early stopping
-    Gn = []
-    for n = 1:num_iters
-    
-        # Gradient objective
-        ∇G = gradient(()-> G(policy), Params([policy]))
-        
-        # Update policy
-        update!(opt, policy, ∇G[policy])
+    # Minimize
+    optimize(G, rand(plan_horizon,), Optim.Options(iterations=num_iters), LBFGS(); autodiff=:forward)
 
-        # Compute EFE for current policy
-        push!(Gn, G(policy))
-    end
-
-    return policy, Gn
+    return policy
 end
 
 function EFE(policy, current_state, goal_state, model_params, transition; order=2, time_horizon=1)
