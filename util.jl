@@ -1,31 +1,29 @@
 
 using LinearAlgebra
 using Optim
-import ForneyLab: unsafeMean, unsafePrecision
-# using Zygote: gradient, Params
-# using Flux: update!, Descent, ADAM
+import ForneyLab: unsafeMean, unsafePrecision, eye
 
 using StatsFuns: @irrational
 @irrational log2π  1.8378770664093454836 log(big(2.)*π)
 
-function kl(μ_p, μ_q, σ_p, σ_q)
+function KLDivergence(μ_p, σ_p, μ_q, σ_q)
     "KL of 2 univariate Normals"
-    log(σ_q / σ_p) + (σ_p + (μ_p - μ_q)^2)/ (2*σ_q) - 0.5
+    return log(σ_q / σ_p) + (σ_p + (μ_p - μ_q)^2)/ (2*σ_q) - 0.5
 end
 
-function umean(d::ProbabilityDistribution{Univariate, T}) where T<:Union{Gaussian,Gamma}
+function mn(d::ProbabilityDistribution{Univariate, T}) where T<:Union{Gaussian,Gamma}
     return ForneyLab.unsafeMean(d)
 end
 
-function umean(d::ProbabilityDistribution{Multivariate, T}) where T<:Union{Gaussian,Gamma}
+function mn(d::ProbabilityDistribution{Multivariate, T}) where T<:Union{Gaussian,Gamma}
     return ForneyLab.unsafeMean(d)
 end
 
-function uprec(d::ProbabilityDistribution{Univariate, T}) where T<:Union{Gaussian,Gamma}
+function pc(d::ProbabilityDistribution{Univariate, T}) where T<:Union{Gaussian,Gamma}
     return ForneyLab.unsafePrecision(d)
 end
 
-function uprec(d::ProbabilityDistribution{Multivariate, T}) where T<:Union{Gaussian,Gamma}
+function pc(d::ProbabilityDistribution{Multivariate, T}) where T<:Union{Gaussian,Gamma}
     return ForneyLab.unsafePrecision(d)
 end
 
@@ -33,21 +31,19 @@ function minEFE(current_state,
                 goal_state,
                 model_params,
                 transition_function; 
-                order=2, 
-                opt=ADAM(0.01,(0.9, 0.8)), 
                 num_iters=100, 
                 plan_horizon=1)
 
     # Objective function
-    G(π) = EFE(π, current_state, goal_state, model_params, transition_function, order=order, time_horizon=plan_horizon)
+    G(π) = EFE(π, current_state, goal_state, model_params, transition_function, time_horizon=plan_horizon)
 
     # Minimize
-    optimize(G, rand(plan_horizon,), Optim.Options(iterations=num_iters), LBFGS(); autodiff=:forward)
+    results = optimize(G, rand(plan_horizon,), Optim.Options(iterations=num_iters), LBFGS(); autodiff=:forward)
 
-    return policy
+    return Optim.minimizer(results)
 end
 
-function EFE(policy, current_state, goal_state, model_params, transition; order=2, time_horizon=1)
+function EFE(policy, prior_state, goal_state, model_params, g; time_horizon=1)
     "Compute Expected Free Energy"
 
     # Unpack goal state
@@ -64,22 +60,22 @@ function EFE(policy, current_state, goal_state, model_params, transition; order=
     s = [1., 0.]
 
     # Start previous state var        
-    μ_kmin = current_state[1]
-    Σ_kmin = current_state[2]
+    μ_kmin = prior_state[1]
+    Σ_kmin = prior_state[2]
 
-    loss = 0.
+    G = 0.
     for k in 1:time_horizon
 
         # State transition
         μ_k = S*μ_kmin + s*g(θ, μ_kmin) + s*η*policy[k]
-        Σ = Σ_kmin + Σ_z
+        Σ_k = Σ_kmin + Σ_z
 
         # calculate the covariance matrix
         H = collect(s')
-        Σ_11 = Σ
-        Σ_21 = H*Σ
-        Σ_12 = Σ*H'
-        Σ_22 = H*Σ*H' + inv(mat(ξ))
+        Σ_11 = Σ_k
+        Σ_21 = H*Σ_k
+        Σ_12 = Σ_k*H'
+        Σ_22 = H*Σ_k*H' + inv(mat(ξ))
 
         # Calculate conditional entropy
         Σ_cond = Σ_22 - Σ_21 * inv(Σ_11) * Σ_12
@@ -89,17 +85,17 @@ function EFE(policy, current_state, goal_state, model_params, transition; order=
         y_hat = s'*μ_k
 
         # Risk as KL between marginal and goal prior
-        risk = kl(μ_star, y_hat, σ_star, Σ_22[1])
+        risk = KLDivergence(μ_star, σ_star, y_hat, Σ_22[1])
         
         # Update loss.
-        loss += risk + ambiguity
+        G += risk + ambiguity
 
         # Update previous state var
         μ_kmin = μ_k
-        Σ_kmin = Σ
+        Σ_kmin = Σ_k
 
     end
-    return loss
+    return G
 end
 
 # Gets the first element and sets everything else to 0
