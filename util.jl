@@ -8,12 +8,6 @@ function eye(dim)
     return Matrix{Float64}(I,dim,dim)
 end
 
-function KLDivergence(μ0, σ0, μ1, σ1)
-    "KL of 2 univariate Normals"
-#     return log(σ_q / σ_p) + (σ_p + (μ_p - μ_q)^2)/ (2*σ_q) - 0.5
-    return 0.5*( (σ0/σ1)^2 + (μ1 - μ0)^2/σ1^2 -1 + 2*log(σ1/σ0))
-end
-
 function mn(d::ProbabilityDistribution{Univariate, T}) where T<:Union{Gaussian,Gamma}
     return ForneyLab.unsafeMean(d)
 end
