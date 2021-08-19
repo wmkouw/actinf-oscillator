@@ -29,3 +29,12 @@ end
 function pc(d::ProbabilityDistribution{Multivariate, T}) where T<:Union{Gaussian,Gamma}
     return ForneyLab.unsafePrecision(d)
 end
+
+function cv(d::ProbabilityDistribution{Univariate, T}) where T<:Union{Gaussian,Gamma}
+    return ForneyLab.unsafeCov(d)
+end
+
+function cv(d::ProbabilityDistribution{Multivariate, T}) where T<:Union{Gaussian,Gamma}
+    return ForneyLab.unsafeCov(d)
+end
+

@@ -1,5 +1,6 @@
 using LinearAlgebra
 using Optim
+using GFX
 
 import StatsFuns: @irrational
 @irrational log2π  1.8378770664093454836 log(big(2.)*π)
@@ -22,7 +23,7 @@ function minEFE(current_state,
     return Optim.minimizer(results)
 end
 
-function EFE(policy, prior_state, goal_state, model_params, g; time_horizon=1)
+function EFE(policy, prior_state, goal_state, model_params, g; time_horizon=1, Δt=1.0)
     "Compute Expected Free Energy"
 
     # Unpack goal state
@@ -32,11 +33,12 @@ function EFE(policy, prior_state, goal_state, model_params, g; time_horizon=1)
     θ, η, ζ, ξ = model_params
 
     # Process noise
-    Σ_z = ζ *[1.  0.; 0.  0.]
+    Σ_z = inv(ζ) *[Δt^3/3   Δt^2/2;
+                   Δt^2/2       Δt]
 
-    # Helper matrices
-    S = [0. 0.; 1. 0.]
-    s = [1., 0.]
+    # Utility matrices
+    S = [1. Δt; 0. 1.]
+    s = [0., Δt]
 
     # Start previous state var        
     μ_kmin = prior_state[1]
