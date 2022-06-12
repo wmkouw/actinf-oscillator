@@ -1,8 +1,7 @@
 
 import LinearAlgebra: I
 import ForneyLab: unsafeMean, unsafePrecision, unsafeCov, eye
-import StatsFuns: @irrational
-@irrational log2π  1.8378770664093454836 log(big(2.)*π)
+import StatsFuns: log2π
 
 function eye(dim)
     return Matrix{Float64}(I,dim,dim)

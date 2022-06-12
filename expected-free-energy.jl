@@ -2,8 +2,7 @@ using LinearAlgebra
 using Optim
 using GFX
 
-import StatsFuns: @irrational
-@irrational log2π  1.8378770664093454836 log(big(2.)*π)
+import StatsFuns: log2π
 
 
 function KLDivergence(μ0, σ0, μ1, σ1)
